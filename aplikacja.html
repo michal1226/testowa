@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zapis do CSV</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 640px; margin: 0 auto; padding: 16px; background: #f5f5f7; color: #222; }
+  h1 { font-size: 1.3rem; }
+  form, .tablebox { background: #fff; padding: 16px; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.1); margin-bottom: 16px; }
+  label { display: block; font-size: .85rem; margin: 10px 0 4px; color: #555; }
+  input { width: 100%; box-sizing: border-box; padding: 10px; font-size: 1rem; border: 1px solid #ccc; border-radius: 8px; }
+  button { padding: 10px 16px; font-size: 1rem; border: 0; border-radius: 8px; cursor: pointer; margin-top: 14px; }
+  .primary { background: #2563eb; color: #fff; width: 100%; }
+  .secondary { background: #e5e7eb; margin-right: 8px; }
+  .danger { background: #fee2e2; color: #b91c1c; }
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  th, td { text-align: left; padding: 6px; border-bottom: 1px solid #eee; word-break: break-word; }
+  #msg { font-size: .85rem; color: #15803d; min-height: 1.2em; margin-top: 8px; }
+</style>
+</head>
+<body>
+<h1>Zapis danych do tabeli CSV</h1>
+
+<form id="form">
+  <label for="f1">Pole 1</label>
+  <input id="f1" type="text" autocomplete="off">
+  <label for="f2">Pole 2</label>
+  <input id="f2" type="text" autocomplete="off">
+  <label for="f3">Pole 3</label>
+  <input id="f3" type="text" autocomplete="off">
+  <button class="primary" type="submit">Zapisz</button>
+  <div id="msg"></div>
+</form>
+
+<div class="tablebox">
+  <table>
+    <thead><tr><th>Pole 1</th><th>Pole 2</th><th>Pole 3</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <button class="secondary" id="download" type="button">Pobierz CSV</button>
+  <button class="danger" id="clear" type="button">Wyczyść tabelę</button>
+</div>
+
+<script>
+const KEY = "dane_csv";
+const form = document.getElementById("form");
+const rowsEl = document.getElementById("rows");
+const msg = document.getElementById("msg");
+const fields = ["f1", "f2", "f3"].map(id => document.getElementById(id));
+
+function load() {
+  try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) { return []; }
+}
+function save(data) { localStorage.setItem(KEY, JSON.stringify(data)); }
+
+function render() {
+  rowsEl.innerHTML = "";
+  load().forEach(r => {
+    const tr = document.createElement("tr");
+    r.forEach(v => { const td = document.createElement("td"); td.textContent = v; tr.appendChild(td); });
+    rowsEl.appendChild(tr);
+  });
+}
+
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzOcseq_jbULk9oc81p5a46k76JV_DoYJmY9xa9FffBntvrx3NTi8vn2W3NYVexus3C/exec";
+const SECRET = "ZMIEN_NA_WLASNE_HASLO"; // to samo hasło, co w skrypcie Google
+
+form.addEventListener("submit", async e => {
+  e.preventDefault();
+  const row = fields.map(f => f.value.trim());
+  if (row.every(v => v === "")) { msg.style.color = "#b91c1c"; msg.textContent = "Wpisz coś w przynajmniej jedno pole."; return; }
+
+  const btn = form.querySelector("button[type=submit]");
+  btn.disabled = true;
+  msg.style.color = "#555"; msg.textContent = "Wysyłanie...";
+
+  // kopia lokalna w przeglądarce
+  const data = load(); data.push(row); save(data);
+  render();
+
+  try {
+    await fetch(SCRIPT_URL, {
+      method: "POST",
+      mode: "no-cors", // odpowiedź jest nieczytelna, ale dane docierają do skryptu
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ secret: SECRET, f1: row[0], f2: row[1], f3: row[2] })
+    });
+    fields.forEach(f => f.value = "");
+    fields[0].focus();
+    msg.style.color = "#15803d"; msg.textContent = "Wysłano do pliku na Dysku Google.";
+  } catch (err) {
+    msg.style.color = "#b91c1c";
+    msg.textContent = "Brak połączenia. Wiersz zapisano tylko lokalnie (widać go w tabeli).";
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+function csvCell(v) { return '"' + String(v).replace(/"/g, '""') + '"'; }
+
+document.getElementById("download").addEventListener("click", () => {
+  const lines = [["Pole 1", "Pole 2", "Pole 3"], ...load()].map(r => r.map(csvCell).join(";"));
+  const blob = new Blob(["\uFEFF" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "dane.csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+document.getElementById("clear").addEventListener("click", () => {
+  if (confirm("Usunąć wszystkie zapisane wiersze?")) { save([]); render(); }
+});
+
+render();
+</script>
+</body>
+</html>
