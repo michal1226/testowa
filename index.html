@@ -100,7 +100,7 @@ form.addEventListener("submit", async e => {
 function csvCell(v) { return '"' + String(v).replace(/"/g, '""') + '"'; }
 
 document.getElementById("download").addEventListener("click", () => {
-  const lines = [["Pole 1", "Pole 2", "Pole 3"], ...load()].map(r => r.map(csvCell).join(";"));
+  const lines = [["Imie", "Pole 2", "Pole 3"], ...load()].map(r => r.map(csvCell).join(";"));
   const blob = new Blob(["\uFEFF" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
